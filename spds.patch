@@ -1,0 +1,621 @@
+diff --git a/SynchronizedPDS/pom.xml b/SynchronizedPDS/pom.xml
+index 22f4a818..a2048dcb 100644
+--- a/SynchronizedPDS/pom.xml
++++ b/SynchronizedPDS/pom.xml
+@@ -3,7 +3,7 @@
+ 	<parent>
+ 		<groupId>de.fraunhofer.iem</groupId>
+ 		<artifactId>SPDS</artifactId>
+-		<version>2.5.1</version>
++		<version>2.5.1-SNAPSHOT</version>
+     	<relativePath>../pom.xml</relativePath>
+ 	</parent>
+ 	<modelVersion>4.0.0</modelVersion>
+@@ -25,7 +25,7 @@
+ 		<dependency>
+ 			<groupId>de.fraunhofer.iem</groupId>
+ 			<artifactId>WPDS</artifactId>
+-			<version>2.5.1</version>
++			<version>2.5.1-SNAPSHOT</version>
+ 		</dependency>
+ 		<dependency>
+ 			<groupId>com.google.guava</groupId>
+diff --git a/SynchronizedPDS/src/main/java/sync/pds/solver/SyncPDSSolver.java b/SynchronizedPDS/src/main/java/sync/pds/solver/SyncPDSSolver.java
+index 8b7a3f48..c5319c84 100644
+--- a/SynchronizedPDS/src/main/java/sync/pds/solver/SyncPDSSolver.java
++++ b/SynchronizedPDS/src/main/java/sync/pds/solver/SyncPDSSolver.java
+@@ -429,7 +429,7 @@ public abstract class SyncPDSSolver<Stmt extends Location, Fact, Field extends L
+         @Override
+         public void onWeightAdded(Transition<Stmt, INode<Fact>> t, W w, WeightedPAutomaton<Stmt, INode<Fact>, W> aut) {
+             if (!(t.getStart() instanceof GeneratedState) && !t.getLabel().equals(callAutomaton.epsilon())) {
+-                Node<Stmt, Fact> node = new Node<Stmt, Fact>(t.getString(), t.getStart().fact());
++                Node<Stmt, Fact> node = new Node<Stmt, Fact>(t.getString(), t.getStart().fact(), t.getStart().getRelatedVariables());
+                 setCallingContextReachable(node);
+             }
+         }
+@@ -451,7 +451,9 @@ public abstract class SyncPDSSolver<Stmt extends Location, Fact, Field extends L
+     }
+ 
+     private Transition<Stmt, INode<Fact>> createInitialCallTransition(Node<Stmt, Fact> curr) {
+-        return new Transition<Stmt, INode<Fact>>(wrap(curr.fact()), curr.stmt(), callAutomaton.getInitialState());
++        final Collection<Fact> relatedVariables = curr.getRelatedVariables();
++        final SingleNode<Fact> factSingleNode = new SingleNode<>(curr.fact(), relatedVariables);
++        return new Transition<>(factSingleNode, curr.stmt(), callAutomaton.getInitialState());
+     }
+ 
+     protected void processNode(Node<Stmt, Fact> curr) {
+diff --git a/SynchronizedPDS/src/main/java/sync/pds/solver/nodes/INode.java b/SynchronizedPDS/src/main/java/sync/pds/solver/nodes/INode.java
+index ab979506..5badd59a 100644
+--- a/SynchronizedPDS/src/main/java/sync/pds/solver/nodes/INode.java
++++ b/SynchronizedPDS/src/main/java/sync/pds/solver/nodes/INode.java
+@@ -13,6 +13,9 @@ package sync.pds.solver.nodes;
+ 
+ import wpds.interfaces.State;
+ 
+-public interface INode<Fact> extends State {
+-    public Fact fact();
++import java.util.Collection;
++import java.util.Collections;
++
++public interface INode<Fact> extends State<Fact> {
++    Fact fact();
+ }
+diff --git a/SynchronizedPDS/src/main/java/sync/pds/solver/nodes/Node.java b/SynchronizedPDS/src/main/java/sync/pds/solver/nodes/Node.java
+index 30bf34cb..1d6b5ba1 100644
+--- a/SynchronizedPDS/src/main/java/sync/pds/solver/nodes/Node.java
++++ b/SynchronizedPDS/src/main/java/sync/pds/solver/nodes/Node.java
+@@ -13,15 +13,25 @@ package sync.pds.solver.nodes;
+ 
+ import wpds.interfaces.State;
+ 
++import java.util.Collection;
++import java.util.HashSet;
++
+ public class Node<Stmt, Fact> implements State {
+ 
+     final protected Stmt stmt;
+     final protected Fact variable;
++    private final Collection<Fact> relatedVariables;
+     private int hashCode;
+ 
+     public Node(Stmt stmt, Fact variable) {
++        this(stmt, variable, new HashSet<>());
++    }
++
++    public Node(Stmt stmt, Fact variable, Collection<Fact> relatedVariables) {
+         this.stmt = stmt;
+         this.variable = variable;
++        this.relatedVariables = relatedVariables;
++        this.relatedVariables.add(this.variable);
+     }
+ 
+     public Stmt stmt() {
+@@ -32,6 +42,10 @@ public class Node<Stmt, Fact> implements State {
+         return variable;
+     }
+ 
++    public Collection<Fact> getRelatedVariables() {
++        return relatedVariables;
++    }
++
+     @Override
+     public int hashCode() {
+         if (hashCode != 0)
+diff --git a/SynchronizedPDS/src/main/java/sync/pds/solver/nodes/SingleNode.java b/SynchronizedPDS/src/main/java/sync/pds/solver/nodes/SingleNode.java
+index 153b8855..8cfed614 100644
+--- a/SynchronizedPDS/src/main/java/sync/pds/solver/nodes/SingleNode.java
++++ b/SynchronizedPDS/src/main/java/sync/pds/solver/nodes/SingleNode.java
+@@ -11,12 +11,34 @@
+  *******************************************************************************/
+ package sync.pds.solver.nodes;
+ 
++import java.util.ArrayList;
++import java.util.Collection;
++import java.util.HashSet;
++
+ public class SingleNode<Fact> implements INode<Fact> {
+-    private Fact fact;
++    private final Fact fact;
+     private int hashCode = 0;
+ 
++    private final Collection<Fact> relatedVariables = new HashSet<>();
++
+     public SingleNode(Fact fact) {
++        this(fact, new ArrayList<>());
++    }
++
++    public SingleNode(Fact fact, Collection<Fact> relatedVariables) {
+         this.fact = fact;
++        this.relatedVariables.addAll(relatedVariables);
++    }
++
++    @Override
++    public Collection<Fact> getRelatedVariables() {
++        return relatedVariables;
++    }
++
++    @Override
++    public void setRelatedVariables(Collection<Fact> relatedVariables) {
++        this.relatedVariables.clear();
++        this.relatedVariables.addAll(relatedVariables);
+     }
+ 
+     @Override
+diff --git a/WPDS/pom.xml b/WPDS/pom.xml
+index 013e9e18..4c9d9c66 100644
+--- a/WPDS/pom.xml
++++ b/WPDS/pom.xml
+@@ -4,7 +4,7 @@
+ 	<parent>
+ 		<groupId>de.fraunhofer.iem</groupId>
+ 		<artifactId>SPDS</artifactId>
+-	    <version>2.5.1</version>
++	    <version>2.5.1-SNAPSHOT</version>
+     	<relativePath>../pom.xml</relativePath>
+ 	</parent>
+ 	<modelVersion>4.0.0</modelVersion>
+@@ -39,5 +39,10 @@
+ 			<version>4.13</version>
+ 			<scope>test</scope>
+ 		</dependency>
++<!--		<dependency>-->
++<!--			<groupId>de.fraunhofer.iem</groupId>-->
++<!--			<artifactId>idealPDS</artifactId>-->
++<!--			<version>2.5.1-SNAPSHOT</version>-->
++<!--		</dependency>-->
+ 	</dependencies>
+ </project>
+\ No newline at end of file
+diff --git a/WPDS/src/main/java/wpds/impl/PostStar.java b/WPDS/src/main/java/wpds/impl/PostStar.java
+index 7a7018d4..f981c95d 100644
+--- a/WPDS/src/main/java/wpds/impl/PostStar.java
++++ b/WPDS/src/main/java/wpds/impl/PostStar.java
+@@ -236,7 +236,9 @@ public abstract class PostStar<N extends Location, D extends State, W extends We
+                 if (!rule.canBeApplied(t, weight)) {
+                     return;
+                 }
+-                update(new Transition<N, D>(p, l2, t.getTarget()), newWeight);
++                final Transition<N, D> trans = new Transition<>(p, l2, t.getTarget());
++                trans.addRelatedVariables(t);
++                update(trans, newWeight);
+             }
+         }
+ 
+diff --git a/WPDS/src/main/java/wpds/impl/Transition.java b/WPDS/src/main/java/wpds/impl/Transition.java
+index 03bc2625..d0b27301 100644
+--- a/WPDS/src/main/java/wpds/impl/Transition.java
++++ b/WPDS/src/main/java/wpds/impl/Transition.java
+@@ -16,37 +16,47 @@ import wpds.interfaces.Location;
+ import wpds.interfaces.State;
+ import wpds.wildcard.Wildcard;
+ 
++import java.util.Collection;
++
+ public class Transition<N extends Location, D extends State> implements Edge<D, N> {
+-    private final D s1;
+-    private final N l1;
+-    private final D s2;
++    private final D start;
++    private final N label;
++    private final D target;
+     private int hashCode;
+ 
+-    public Transition(D s1, N l1, D s2) {
+-        assert s1 != null;
+-        assert s2 != null;
+-        assert l1 != null;
+-        this.s1 = s1;
+-        this.l1 = l1;
+-        this.s2 = s2;
+-        if (l1 instanceof Wildcard)
++    public Transition(D start, N label, D target) {
++        assert start != null;
++        assert target != null;
++        assert label != null;
++        this.start = start;
++        this.label = label;
++        this.target = target;
++        if (label instanceof Wildcard)
+             throw new RuntimeException("No wildcards allowed!");
+     }
+ 
++    public void addRelatedVariables(Transition<N, D> transition) {
++        final D start = transition.getStart();
++        if (start != null) {
++            final Collection<?> relatedVariables = ((State<?>) start).getRelatedVariables();
++            this.start.setRelatedVariables(relatedVariables);
++        }
++    }
++
+     public Configuration<N, D> getStartConfig() {
+-        return new Configuration<N, D>(l1, s1);
++        return new Configuration<N, D>(label, start);
+     }
+ 
+     public D getTarget() {
+-        return s2;
++        return target;
+     }
+ 
+     public D getStart() {
+-        return s1;
++        return start;
+     }
+ 
+     public N getString() {
+-        return l1;
++        return label;
+     }
+ 
+     @Override
+@@ -55,9 +65,9 @@ public class Transition<N extends Location, D extends State> implements Edge<D,
+             return hashCode;
+         final int prime = 31;
+         int result = 1;
+-        result = prime * result + ((l1 == null) ? 0 : l1.hashCode());
+-        result = prime * result + ((s1 == null) ? 0 : s1.hashCode());
+-        result = prime * result + ((s2 == null) ? 0 : s2.hashCode());
++        result = prime * result + ((label == null) ? 0 : label.hashCode());
++        result = prime * result + ((start == null) ? 0 : start.hashCode());
++        result = prime * result + ((target == null) ? 0 : target.hashCode());
+         hashCode = result;
+         return hashCode;
+     }
+@@ -71,31 +81,31 @@ public class Transition<N extends Location, D extends State> implements Edge<D,
+         if (getClass() != obj.getClass())
+             return false;
+         Transition other = (Transition) obj;
+-        if (l1 == null) {
+-            if (other.l1 != null)
++        if (label == null) {
++            if (other.label != null)
+                 return false;
+-        } else if (!l1.equals(other.l1))
++        } else if (!label.equals(other.label))
+             return false;
+-        if (s1 == null) {
+-            if (other.s1 != null)
++        if (start == null) {
++            if (other.start != null)
+                 return false;
+-        } else if (!s1.equals(other.s1))
++        } else if (!start.equals(other.start))
+             return false;
+-        if (s2 == null) {
+-            if (other.s2 != null)
++        if (target == null) {
++            if (other.target != null)
+                 return false;
+-        } else if (!s2.equals(other.s2))
++        } else if (!target.equals(other.target))
+             return false;
+         return true;
+     }
+ 
+     @Override
+     public String toString() {
+-        return s1 + "~" + l1 + "~>" + s2;
++        return start + "~" + label + "~>" + target;
+     }
+ 
+     @Override
+     public N getLabel() {
+-        return l1;
++        return label;
+     }
+ }
+diff --git a/WPDS/src/main/java/wpds/interfaces/State.java b/WPDS/src/main/java/wpds/interfaces/State.java
+index c4b186e8..fadb03be 100644
+--- a/WPDS/src/main/java/wpds/interfaces/State.java
++++ b/WPDS/src/main/java/wpds/interfaces/State.java
+@@ -11,6 +11,15 @@
+  *******************************************************************************/
+ package wpds.interfaces;
+ 
+-public interface State {
++import java.util.Collection;
++import java.util.Collections;
+ 
++public interface State<Fact> {
++    default Collection<Fact> getRelatedVariables() {
++        return Collections.emptyList();
++    }
++
++    default void setRelatedVariables(Collection<Fact> relatedVariables) {
++
++    }
+ }
+diff --git a/boomerangPDS/pom.xml b/boomerangPDS/pom.xml
+index 4d4615ae..40a22f2f 100644
+--- a/boomerangPDS/pom.xml
++++ b/boomerangPDS/pom.xml
+@@ -4,7 +4,7 @@
+     <parent>
+ 		<groupId>de.fraunhofer.iem</groupId>
+ 		<artifactId>SPDS</artifactId>
+-		<version>2.5.1</version>
++		<version>2.5.1-SNAPSHOT</version>
+     	<relativePath>../pom.xml</relativePath>
+ 	</parent>
+ 	<modelVersion>4.0.0</modelVersion>
+@@ -26,12 +26,12 @@
+ 		<dependency>
+ 			<groupId>de.fraunhofer.iem</groupId>
+ 			<artifactId>testCore</artifactId>
+-			<version>2.5.1</version>
++			<version>2.5.1-SNAPSHOT</version>
+ 		</dependency>
+ 		<dependency>
+ 			<groupId>de.fraunhofer.iem</groupId>
+ 			<artifactId>WPDS</artifactId>
+-			<version>2.5.1</version>
++			<version>2.5.1-SNAPSHOT</version>
+ 		</dependency>
+ 		<dependency>
+ 			<groupId>com.google.guava</groupId>
+@@ -56,7 +56,7 @@
+ 		<dependency>
+ 			<groupId>de.fraunhofer.iem</groupId>
+ 			<artifactId>synchronizedPDS</artifactId>
+-			<version>2.5.1</version>
++			<version>2.5.1-SNAPSHOT</version>
+ 		</dependency>
+ 		<dependency>
+ 			<groupId>com.googlecode.json-simple</groupId>
+diff --git a/boomerangPDS/src/main/java/boomerang/Query.java b/boomerangPDS/src/main/java/boomerang/Query.java
+index 395b5770..2031b628 100644
+--- a/boomerangPDS/src/main/java/boomerang/Query.java
++++ b/boomerangPDS/src/main/java/boomerang/Query.java
+@@ -16,18 +16,32 @@ import boomerang.jimple.Val;
+ import soot.Type;
+ import sync.pds.solver.nodes.Node;
+ 
++import java.util.Collection;
++import java.util.HashSet;
++
+ public abstract class Query {
+ 
+     private final Statement stmt;
+     private final Val variable;
+ 
++    private final Collection<Val> relatedVariables;
++
+     public Query(Statement stmt, Val variable) {
+         this.stmt = stmt;
+         this.variable = variable;
++        this.relatedVariables = new HashSet<>();
++    }
++
++    public void addRelatedVariable(Val variable) {
++        this.relatedVariables.add(variable);
++    }
++
++    public Collection<Val> getRelatedVariables() {
++        return relatedVariables;
+     }
+ 
+     public Node<Statement, Val> asNode() {
+-        return new Node<Statement, Val>(stmt, variable);
++        return new Node<>(stmt, variable, relatedVariables);
+     }
+ 
+     @Override
+diff --git a/boomerangPDS/src/main/java/boomerang/WeightedForwardQuery.java b/boomerangPDS/src/main/java/boomerang/WeightedForwardQuery.java
+index 70a2b157..cf6441d7 100644
+--- a/boomerangPDS/src/main/java/boomerang/WeightedForwardQuery.java
++++ b/boomerangPDS/src/main/java/boomerang/WeightedForwardQuery.java
+@@ -13,8 +13,12 @@ package boomerang;
+ 
+ import boomerang.jimple.Statement;
+ import boomerang.jimple.Val;
++import sync.pds.solver.nodes.Node;
+ import wpds.impl.Weight;
+ 
++import java.util.Collection;
++import java.util.HashSet;
++
+ public class WeightedForwardQuery<W extends Weight> extends ForwardQuery {
+ 
+     private final W weight;
+@@ -22,10 +26,9 @@ public class WeightedForwardQuery<W extends Weight> extends ForwardQuery {
+     public WeightedForwardQuery(Statement stmt, Val variable, W weight) {
+         super(stmt, variable);
+         this.weight = weight;
+-    }
+-
++     }
++     
+     public W weight() {
+         return weight;
+     };
+-
+ }
+diff --git a/boomerangPDS/src/main/java/boomerang/solver/ForwardBoomerangSolver.java b/boomerangPDS/src/main/java/boomerang/solver/ForwardBoomerangSolver.java
+index a9b666f0..8434b915 100644
+--- a/boomerangPDS/src/main/java/boomerang/solver/ForwardBoomerangSolver.java
++++ b/boomerangPDS/src/main/java/boomerang/solver/ForwardBoomerangSolver.java
+@@ -445,8 +445,7 @@ public abstract class ForwardBoomerangSolver<W extends Weight> extends AbstractB
+     protected void callFlow(SootMethod caller, Node<Statement, Val> currNode, Stmt callSite, InvokeExpr invokeExpr) {
+         assert icfg.isCallStmt(callSite);
+         if (invokeExpr.getMethod().getDeclaringClass().isPhantom() || invokeExpr.getMethod().isNative()) {
+-            for (State s : computeNormalFlow(caller, currNode.stmt().getUnit().get(), currNode.fact(),
+-                    (Stmt) callSite)) {
++            for (State s : computeNormalFlow(caller, currNode.stmt().getUnit().get(), currNode.fact(), callSite)) {
+                 propagate(currNode, s);
+             }
+             for (Statement returnSite : getSuccsOf(currNode.stmt())) {
+diff --git a/idealPDS/pom.xml b/idealPDS/pom.xml
+index ad6790da..9b5889fa 100644
+--- a/idealPDS/pom.xml
++++ b/idealPDS/pom.xml
+@@ -3,7 +3,7 @@
+    <parent>
+ 		<groupId>de.fraunhofer.iem</groupId>
+ 		<artifactId>SPDS</artifactId>
+-		<version>2.5.1</version>
++		<version>2.5.1-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+ 	</parent>
+     <modelVersion>4.0.0</modelVersion>
+@@ -22,20 +22,20 @@
+         </plugins>
+     </build>
+     <dependencies>
+-        <dependency>
+-            <groupId>de.fraunhofer.iem</groupId>
+-            <artifactId>testCore</artifactId>
+-            <version>2.5.1</version>
+-        </dependency>
++<!--        <dependency>-->
++<!--            <groupId>de.fraunhofer.iem</groupId>-->
++<!--            <artifactId>testCore</artifactId>-->
++<!--            <version>2.5.1-SNAPSHOT</version>-->
++<!--        </dependency>-->
+         <dependency>
+             <groupId>de.fraunhofer.iem</groupId>
+             <artifactId>boomerangPDS</artifactId>
+-            <version>2.5.1</version>
++            <version>2.5.1-SNAPSHOT</version>
+         </dependency>
+         <dependency>
+             <groupId>de.fraunhofer.iem</groupId>
+             <artifactId>WPDS</artifactId>
+-            <version>2.5.1</version>
++            <version>2.5.1-SNAPSHOT</version>
+         </dependency>
+         <dependency>
+             <groupId>com.google.guava</groupId>
+@@ -60,7 +60,7 @@
+         <dependency>
+             <groupId>de.fraunhofer.iem</groupId>
+             <artifactId>synchronizedPDS</artifactId>
+-            <version>2.5.1</version>
++            <version>2.5.1-SNAPSHOT</version>
+         </dependency>
+         <dependency>
+ 		    <groupId>org.slf4j</groupId>
+diff --git a/idealPDS/src/main/java/typestate/finiteautomata/TypeStateMachineWeightFunctions.java b/idealPDS/src/main/java/typestate/finiteautomata/TypeStateMachineWeightFunctions.java
+index 760589fd..e931c223 100644
+--- a/idealPDS/src/main/java/typestate/finiteautomata/TypeStateMachineWeightFunctions.java
++++ b/idealPDS/src/main/java/typestate/finiteautomata/TypeStateMachineWeightFunctions.java
+@@ -3,7 +3,7 @@
+  * This program and the accompanying materials are made available under the
+  * terms of the Eclipse Public License 2.0 which is available at
+  * http://www.eclipse.org/legal/epl-2.0.
+- *  
++ *
+  * SPDX-License-Identifier: EPL-2.0
+  *
+  * Contributors:
+@@ -18,6 +18,7 @@ import java.util.LinkedList;
+ import java.util.List;
+ import java.util.Set;
+ import java.util.regex.Pattern;
++import java.util.stream.Collectors;
+ 
+ import com.google.common.base.Joiner;
+ import com.google.common.base.Predicate;
+@@ -94,16 +95,17 @@ public abstract class TypeStateMachineWeightFunctions
+         return getOne();
+     }
+ 
+-    public TransitionFunction callToReturn(Node<Statement, Val> curr, Node<Statement, Val> succ,
+-            InvokeExpr invokeExpr) {
++    public TransitionFunction callToReturn(Node<Statement, Val> curr, Node<Statement, Val> succ, InvokeExpr invokeExpr) {
+         Set<Transition> res = Sets.newHashSet();
+         if (invokeExpr instanceof InstanceInvokeExpr) {
+             SootMethod method = invokeExpr.getMethod();
+             InstanceInvokeExpr e = (InstanceInvokeExpr) invokeExpr;
+-            if (e.getBase().equals(succ.fact().value())) {
++            final boolean isBaseVariableRelated = curr.getRelatedVariables().stream().anyMatch(v -> v.value().equals(e.getBase()));
++            if (isBaseVariableRelated) {
+                 for (MatcherTransition trans : transition) {
+-                    if (trans.matches(method) && (trans.getType().equals(Type.OnCallToReturn)
+-                            || trans.getType().equals(Type.OnCallOrOnCallToReturn))) {
++                    if (trans.matches(method) && (trans.getType().equals(Type.OnCallToReturn) ||
++                            trans.getType().equals(Type.OnCallOrOnCallToReturn))
++                    ) {
+                         res.add(trans);
+                     }
+                 }
+@@ -113,7 +115,7 @@ public abstract class TypeStateMachineWeightFunctions
+     }
+ 
+     private TransitionFunction getMatchingTransitions(Statement statement, Val node, Statement transitionStmt,
+-            Collection<MatcherTransition> filteredTrans) {
++                                                      Collection<MatcherTransition> filteredTrans) {
+         Set<ITransition> res = new HashSet<>();
+         for (MatcherTransition trans : filteredTrans) {
+             if (trans.matches(statement.getMethod())) {
+@@ -164,7 +166,7 @@ public abstract class TypeStateMachineWeightFunctions
+     }
+ 
+     protected Collection<Val> generateAtConstructor(SootMethod m, Unit unit, Collection<SootMethod> calledMethod,
+-            MatcherTransition initialTrans) {
++                                                    MatcherTransition initialTrans) {
+         boolean matches = false;
+         for (SootMethod method : calledMethod) {
+             if (initialTrans.matches(method)) {
+@@ -200,7 +202,7 @@ public abstract class TypeStateMachineWeightFunctions
+     }
+ 
+     protected Collection<WeightedForwardQuery<TransitionFunction>> generateThisAtAnyCallSitesOf(SootMethod m, Unit unit,
+-            Collection<SootMethod> invokesMethod) {
++                                                                                                Collection<SootMethod> invokesMethod) {
+         if (unit instanceof Stmt) {
+             if (((Stmt) unit).containsInvokeExpr() && ((Stmt) unit).getInvokeExpr() instanceof InstanceInvokeExpr) {
+                 InstanceInvokeExpr iie = (InstanceInvokeExpr) ((Stmt) unit).getInvokeExpr();
+@@ -216,7 +218,7 @@ public abstract class TypeStateMachineWeightFunctions
+     }
+ 
+     protected Collection<WeightedForwardQuery<TransitionFunction>> generateAtAllocationSiteOf(SootMethod m, Unit unit,
+-            Class allocationSuperType) {
++                                                                                              Class allocationSuperType) {
+         if (unit instanceof AssignStmt) {
+             AssignStmt assignStmt = (AssignStmt) unit;
+             if (assignStmt.getRightOp() instanceof NewExpr) {
+diff --git a/pom.xml b/pom.xml
+index 0754ce8a..b99da851 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -5,7 +5,7 @@
+ 	<modelVersion>4.0.0</modelVersion>
+ 	<groupId>de.fraunhofer.iem</groupId>
+ 	<artifactId>SPDS</artifactId>
+-	<version>2.5.1</version>
++	<version>2.5.1-SNAPSHOT</version>
+ 	<packaging>pom</packaging>
+ 	<name>SPDS</name>
+ 	<modules>
+diff --git a/testCore/pom.xml b/testCore/pom.xml
+index 425f20a4..386e4f9a 100644
+--- a/testCore/pom.xml
++++ b/testCore/pom.xml
+@@ -4,7 +4,7 @@
+ 	<parent>
+ 	    <groupId>de.fraunhofer.iem</groupId>
+ 	    <artifactId>SPDS</artifactId>
+-	    <version>2.5.1</version>
++	    <version>2.5.1-SNAPSHOT</version>
+     	<relativePath>../pom.xml</relativePath>
+   	</parent>
+ 	<modelVersion>4.0.0</modelVersion>
+@@ -13,7 +13,7 @@
+ 		<dependency>
+ 			<groupId>de.fraunhofer.iem</groupId>
+ 			<artifactId>WPDS</artifactId>
+-			<version>2.5.1</version>
++			<version>2.5.1-SNAPSHOT</version>
+ 		</dependency>
+ 		<dependency>
+ 			<groupId>com.google.guava</groupId>
+@@ -38,7 +38,7 @@
+ 		<dependency>
+ 			<groupId>de.fraunhofer.iem</groupId>
+ 			<artifactId>synchronizedPDS</artifactId>
+-			<version>2.5.1</version>
++			<version>2.5.1-SNAPSHOT</version>
+ 		</dependency>
+ 	</dependencies>
+ </project>
+\ No newline at end of file

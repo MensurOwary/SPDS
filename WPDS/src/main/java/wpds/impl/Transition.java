@@ -16,37 +16,47 @@ import wpds.interfaces.Location;
 import wpds.interfaces.State;
 import wpds.wildcard.Wildcard;
 
+import java.util.Collection;
+
 public class Transition<N extends Location, D extends State> implements Edge<D, N> {
-    private final D s1;
-    private final N l1;
-    private final D s2;
+    private final D start;
+    private final N label;
+    private final D target;
     private int hashCode;
 
-    public Transition(D s1, N l1, D s2) {
-        assert s1 != null;
-        assert s2 != null;
-        assert l1 != null;
-        this.s1 = s1;
-        this.l1 = l1;
-        this.s2 = s2;
-        if (l1 instanceof Wildcard)
+    public Transition(D start, N label, D target) {
+        assert start != null;
+        assert target != null;
+        assert label != null;
+        this.start = start;
+        this.label = label;
+        this.target = target;
+        if (label instanceof Wildcard)
             throw new RuntimeException("No wildcards allowed!");
     }
 
+    public void addRelatedVariables(Transition<N, D> transition) {
+        final D start = transition.getStart();
+        if (start != null) {
+            final Collection<?> relatedVariables = ((State<?>) start).getRelatedVariables();
+            this.start.setRelatedVariables(relatedVariables);
+        }
+    }
+
     public Configuration<N, D> getStartConfig() {
-        return new Configuration<N, D>(l1, s1);
+        return new Configuration<N, D>(label, start);
     }
 
     public D getTarget() {
-        return s2;
+        return target;
     }
 
     public D getStart() {
-        return s1;
+        return start;
     }
 
     public N getString() {
-        return l1;
+        return label;
     }
 
     @Override
@@ -55,9 +65,9 @@ public class Transition<N extends Location, D extends State> implements Edge<D, 
             return hashCode;
         final int prime = 31;
         int result = 1;
-        result = prime * result + ((l1 == null) ? 0 : l1.hashCode());
-        result = prime * result + ((s1 == null) ? 0 : s1.hashCode());
-        result = prime * result + ((s2 == null) ? 0 : s2.hashCode());
+        result = prime * result + ((label == null) ? 0 : label.hashCode());
+        result = prime * result + ((start == null) ? 0 : start.hashCode());
+        result = prime * result + ((target == null) ? 0 : target.hashCode());
         hashCode = result;
         return hashCode;
     }
@@ -71,31 +81,31 @@ public class Transition<N extends Location, D extends State> implements Edge<D, 
         if (getClass() != obj.getClass())
             return false;
         Transition other = (Transition) obj;
-        if (l1 == null) {
-            if (other.l1 != null)
+        if (label == null) {
+            if (other.label != null)
                 return false;
-        } else if (!l1.equals(other.l1))
+        } else if (!label.equals(other.label))
             return false;
-        if (s1 == null) {
-            if (other.s1 != null)
+        if (start == null) {
+            if (other.start != null)
                 return false;
-        } else if (!s1.equals(other.s1))
+        } else if (!start.equals(other.start))
             return false;
-        if (s2 == null) {
-            if (other.s2 != null)
+        if (target == null) {
+            if (other.target != null)
                 return false;
-        } else if (!s2.equals(other.s2))
+        } else if (!target.equals(other.target))
             return false;
         return true;
     }
 
     @Override
     public String toString() {
-        return s1 + "~" + l1 + "~>" + s2;
+        return start + "~" + label + "~>" + target;
     }
 
     @Override
     public N getLabel() {
-        return l1;
+        return label;
     }
 }

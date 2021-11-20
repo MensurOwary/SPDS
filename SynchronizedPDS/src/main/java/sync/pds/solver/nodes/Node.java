@@ -13,15 +13,25 @@ package sync.pds.solver.nodes;
 
 import wpds.interfaces.State;
 
+import java.util.Collection;
+import java.util.HashSet;
+
 public class Node<Stmt, Fact> implements State {
 
     final protected Stmt stmt;
     final protected Fact variable;
+    private final Collection<Fact> relatedVariables;
     private int hashCode;
 
     public Node(Stmt stmt, Fact variable) {
+        this(stmt, variable, new HashSet<>());
+    }
+
+    public Node(Stmt stmt, Fact variable, Collection<Fact> relatedVariables) {
         this.stmt = stmt;
         this.variable = variable;
+        this.relatedVariables = relatedVariables;
+        this.relatedVariables.add(this.variable);
     }
 
     public Stmt stmt() {
@@ -30,6 +40,10 @@ public class Node<Stmt, Fact> implements State {
 
     public Fact fact() {
         return variable;
+    }
+
+    public Collection<Fact> getRelatedVariables() {
+        return relatedVariables;
     }
 
     @Override

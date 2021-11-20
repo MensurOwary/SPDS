@@ -16,18 +16,32 @@ import boomerang.jimple.Val;
 import soot.Type;
 import sync.pds.solver.nodes.Node;
 
+import java.util.Collection;
+import java.util.HashSet;
+
 public abstract class Query {
 
     private final Statement stmt;
     private final Val variable;
 
+    private final Collection<Val> relatedVariables;
+
     public Query(Statement stmt, Val variable) {
         this.stmt = stmt;
         this.variable = variable;
+        this.relatedVariables = new HashSet<>();
+    }
+
+    public void addRelatedVariable(Val variable) {
+        this.relatedVariables.add(variable);
+    }
+
+    public Collection<Val> getRelatedVariables() {
+        return relatedVariables;
     }
 
     public Node<Statement, Val> asNode() {
-        return new Node<Statement, Val>(stmt, variable);
+        return new Node<>(stmt, variable, relatedVariables);
     }
 
     @Override

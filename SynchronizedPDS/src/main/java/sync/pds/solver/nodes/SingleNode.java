@@ -11,12 +11,34 @@
  *******************************************************************************/
 package sync.pds.solver.nodes;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+
 public class SingleNode<Fact> implements INode<Fact> {
-    private Fact fact;
+    private final Fact fact;
     private int hashCode = 0;
 
+    private final Collection<Fact> relatedVariables = new HashSet<>();
+
     public SingleNode(Fact fact) {
+        this(fact, new ArrayList<>());
+    }
+
+    public SingleNode(Fact fact, Collection<Fact> relatedVariables) {
         this.fact = fact;
+        this.relatedVariables.addAll(relatedVariables);
+    }
+
+    @Override
+    public Collection<Fact> getRelatedVariables() {
+        return relatedVariables;
+    }
+
+    @Override
+    public void setRelatedVariables(Collection<Fact> relatedVariables) {
+        this.relatedVariables.clear();
+        this.relatedVariables.addAll(relatedVariables);
     }
 
     @Override

@@ -13,7 +13,11 @@ package boomerang;
 
 import boomerang.jimple.Statement;
 import boomerang.jimple.Val;
+import sync.pds.solver.nodes.Node;
 import wpds.impl.Weight;
+
+import java.util.Collection;
+import java.util.HashSet;
 
 public class WeightedForwardQuery<W extends Weight> extends ForwardQuery {
 
@@ -22,10 +26,9 @@ public class WeightedForwardQuery<W extends Weight> extends ForwardQuery {
     public WeightedForwardQuery(Statement stmt, Val variable, W weight) {
         super(stmt, variable);
         this.weight = weight;
-    }
-
+     }
+     
     public W weight() {
         return weight;
     };
-
 }

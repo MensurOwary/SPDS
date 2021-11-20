@@ -3,7 +3,7 @@
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License 2.0 which is available at
  * http://www.eclipse.org/legal/epl-2.0.
- *  
+ *
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
@@ -18,6 +18,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Predicate;
@@ -94,16 +95,17 @@ public abstract class TypeStateMachineWeightFunctions
         return getOne();
     }
 
-    public TransitionFunction callToReturn(Node<Statement, Val> curr, Node<Statement, Val> succ,
-            InvokeExpr invokeExpr) {
+    public TransitionFunction callToReturn(Node<Statement, Val> curr, Node<Statement, Val> succ, InvokeExpr invokeExpr) {
         Set<Transition> res = Sets.newHashSet();
         if (invokeExpr instanceof InstanceInvokeExpr) {
             SootMethod method = invokeExpr.getMethod();
             InstanceInvokeExpr e = (InstanceInvokeExpr) invokeExpr;
-            if (e.getBase().equals(succ.fact().value())) {
+            final boolean isBaseVariableRelated = curr.getRelatedVariables().stream().anyMatch(v -> v.value().equals(e.getBase()));
+            if (isBaseVariableRelated) {
                 for (MatcherTransition trans : transition) {
-                    if (trans.matches(method) && (trans.getType().equals(Type.OnCallToReturn)
-                            || trans.getType().equals(Type.OnCallOrOnCallToReturn))) {
+                    if (trans.matches(method) && (trans.getType().equals(Type.OnCallToReturn) ||
+                            trans.getType().equals(Type.OnCallOrOnCallToReturn))
+                    ) {
                         res.add(trans);
                     }
                 }
@@ -113,7 +115,7 @@ public abstract class TypeStateMachineWeightFunctions
     }
 
     private TransitionFunction getMatchingTransitions(Statement statement, Val node, Statement transitionStmt,
-            Collection<MatcherTransition> filteredTrans) {
+                                                      Collection<MatcherTransition> filteredTrans) {
         Set<ITransition> res = new HashSet<>();
         for (MatcherTransition trans : filteredTrans) {
             if (trans.matches(statement.getMethod())) {
@@ -164,7 +166,7 @@ public abstract class TypeStateMachineWeightFunctions
     }
 
     protected Collection<Val> generateAtConstructor(SootMethod m, Unit unit, Collection<SootMethod> calledMethod,
-            MatcherTransition initialTrans) {
+                                                    MatcherTransition initialTrans) {
         boolean matches = false;
         for (SootMethod method : calledMethod) {
             if (initialTrans.matches(method)) {
@@ -200,7 +202,7 @@ public abstract class TypeStateMachineWeightFunctions
     }
 
     protected Collection<WeightedForwardQuery<TransitionFunction>> generateThisAtAnyCallSitesOf(SootMethod m, Unit unit,
-            Collection<SootMethod> invokesMethod) {
+                                                                                                Collection<SootMethod> invokesMethod) {
         if (unit instanceof Stmt) {
             if (((Stmt) unit).containsInvokeExpr() && ((Stmt) unit).getInvokeExpr() instanceof InstanceInvokeExpr) {
                 InstanceInvokeExpr iie = (InstanceInvokeExpr) ((Stmt) unit).getInvokeExpr();
@@ -216,7 +218,7 @@ public abstract class TypeStateMachineWeightFunctions
     }
 
     protected Collection<WeightedForwardQuery<TransitionFunction>> generateAtAllocationSiteOf(SootMethod m, Unit unit,
-            Class allocationSuperType) {
+                                                                                              Class allocationSuperType) {
         if (unit instanceof AssignStmt) {
             AssignStmt assignStmt = (AssignStmt) unit;
             if (assignStmt.getRightOp() instanceof NewExpr) {

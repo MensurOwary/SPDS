@@ -11,6 +11,15 @@
  *******************************************************************************/
 package wpds.interfaces;
 
-public interface State {
+import java.util.Collection;
+import java.util.Collections;
 
+public interface State<Fact> {
+    default Collection<Fact> getRelatedVariables() {
+        return Collections.emptyList();
+    }
+
+    default void setRelatedVariables(Collection<Fact> relatedVariables) {
+
+    }
 }

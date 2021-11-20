@@ -236,7 +236,9 @@ public abstract class PostStar<N extends Location, D extends State, W extends We
                 if (!rule.canBeApplied(t, weight)) {
                     return;
                 }
-                update(new Transition<N, D>(p, l2, t.getTarget()), newWeight);
+                final Transition<N, D> trans = new Transition<>(p, l2, t.getTarget());
+                trans.addRelatedVariables(t);
+                update(trans, newWeight);
             }
         }
 
