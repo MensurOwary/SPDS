@@ -22,7 +22,10 @@ import boomerang.preanalysis.BoomerangPretransformer;
 import boomerang.results.BackwardBoomerangResults;
 import boomerang.seedfactory.SeedFactory;
 import boomerang.seedfactory.SimpleSeedFactory;
+import boomerang.util.AccessPath;
 import soot.*;
+import soot.jimple.InstanceInvokeExpr;
+import soot.jimple.InvokeExpr;
 import soot.jimple.Stmt;
 import soot.jimple.toolkits.callgraph.ReachableMethods;
 import soot.options.Options;
@@ -136,6 +139,29 @@ public class ExampleMain {
 
                 System.out.println("All aliasing access path of the query variable are:");
                 System.out.println(backwardQueryResults.getAllAliases());
+                System.out.println("========================>");
+                for (AccessPath allAlias : backwardQueryResults.getAllAliases()) {
+                    System.out.println(allAlias);
+                    final Value value = allAlias.getBase().value();
+                    final SootMethod m = allAlias.getBase().m();
+                    System.out.println(m.getName());
+                    if (m.hasActiveBody()) {
+                        for (Unit unit : m.getActiveBody().getUnits()) {
+                            if (unit instanceof Stmt) {
+                                final Stmt stmt = (Stmt) unit;
+                                if (stmt.containsInvokeExpr()) {
+                                    final InvokeExpr invokeExpr = stmt.getInvokeExpr();
+                                    if (invokeExpr instanceof InstanceInvokeExpr) {
+                                        final InstanceInvokeExpr iiex = (InstanceInvokeExpr) invokeExpr;
+                                        if (iiex.getBase().equals(value)) {
+                                            System.out.println(iiex.getMethod().getName());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             private BackwardQuery createQuery() {

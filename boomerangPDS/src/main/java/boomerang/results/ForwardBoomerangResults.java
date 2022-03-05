@@ -46,7 +46,7 @@ public class ForwardBoomerangResults<W extends Weight> extends AbstractBoomerang
     private final IBoomerangStats<W> stats;
     private Stopwatch analysisWatch;
     private long maxMemory;
-    private ObservableICFG<Unit, SootMethod> icfg;
+    private final ObservableICFG<Unit, SootMethod> icfg;
 
     public ForwardBoomerangResults(ForwardQuery query, ObservableICFG<Unit, SootMethod> icfg, boolean timedout,
             DefaultValueMap<Query, AbstractBoomerangSolver<W>> queryToSolvers, IBoomerangStats<W> stats,
@@ -67,6 +67,10 @@ public class ForwardBoomerangResults<W extends Weight> extends AbstractBoomerang
 
     public boolean isTimedout() {
         return timedout;
+    }
+
+    public ObservableICFG<Unit, SootMethod> getIcfg() {
+        return this.icfg;
     }
 
     public Table<Statement, Val, W> getObjectDestructingStatements() {

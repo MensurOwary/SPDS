@@ -82,7 +82,6 @@ public class ObservableDynamicICFG implements ObservableICFG<Unit, SootMethod> {
     }
 
     @Override
-    
     public void onCreatedSolver(Query q, AbstractBoomerangSolver solver) {
       if(solver instanceof ForwardBoomerangSolver) {
         ForwardQuery forwardQuery = (ForwardQuery) q;
@@ -579,4 +578,7 @@ public class ObservableDynamicICFG implements ObservableICFG<Unit, SootMethod> {
         callerListeners.clear();
     }
 
+    public CallGraph getPrecomputedCallGraph() {
+        return precomputedCallGraph;
+    }
 }

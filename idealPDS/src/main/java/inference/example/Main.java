@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import boomerang.callgraph.ObservableDynamicICFG;
+import boomerang.callgraph.ObservableICFG;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,7 +61,7 @@ public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
     public static void main(String... args) {
-        String sootClassPath = System.getProperty("user.dir") + File.separator + "target" + File.separator + "classes";
+        String sootClassPath = System.getProperty("user.dir") + File.separator + "idealPDS" + File.separator + "target" + File.separator + "classes";
         String mainClass = "inference.example.InferenceExample";
         setupSoot(sootClassPath, mainClass);
         analyze();
@@ -116,7 +118,7 @@ public class Main {
 
                             @Override
                             public Collection<WeightedForwardQuery<InferenceWeight>> generate(SootMethod method,
-                                    Unit stmt) {
+                                                                                              Unit stmt) {
                                 if (stmt instanceof AssignStmt) {
                                     AssignStmt as = (AssignStmt) stmt;
                                     if (as.getRightOp() instanceof NewExpr && as.getRightOp().getType().toString()
@@ -143,12 +145,17 @@ public class Main {
                             public IDEALResultHandler<InferenceWeight> getResultHandler() {
                                 return resultHandler;
                             }
+
+                            @Override
+                            public ObservableICFG<Unit, SootMethod> icfg() {
+                                return new ObservableDynamicICFG(false);
+                            }
                         });
                 solver.run();
-                Map<WeightedForwardQuery<InferenceWeight>, ForwardBoomerangResults<InferenceWeight>> res = resultHandler
-                        .getResults();
-                for (Entry<WeightedForwardQuery<InferenceWeight>, ForwardBoomerangResults<InferenceWeight>> e : res
-                        .entrySet()) {
+                Map<WeightedForwardQuery<InferenceWeight>, ForwardBoomerangResults<InferenceWeight>> res
+                        = resultHandler.getResults();
+                System.out.println(res.size());
+                for (Entry<WeightedForwardQuery<InferenceWeight>, ForwardBoomerangResults<InferenceWeight>> e : res.entrySet()) {
                     Table<Statement, Val, InferenceWeight> results = e.getValue().asStatementValWeightTable();
                     logger.info(Joiner.on("\n").join(results.cellSet()));
                 }
